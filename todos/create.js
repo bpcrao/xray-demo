@@ -1,14 +1,18 @@
 'use strict';
 
 const uuid = require('uuid');
-const AWS = require('aws-sdk'); // eslint-disable-line import/no-extraneous-dependencies
+var AWSXRay = require('aws-xray-sdk');
+
+const AWS = AWSXRay.captureAWS(require('aws-sdk')); // eslint-disable-line import/no-extraneous-dependencies
+
+// const dynamoDb = new AWS.DynamoDB.DocumentClient();
 
 const dynamoDb = new AWS.DynamoDB.DocumentClient();
 
 module.exports.create = (event, context, callback) => {
   const timestamp = new Date().getTime();
   const data = JSON.parse(event.body);
-  if (typeof data.text !== 'string') {
+  if (typeof data.text !== 'string' || data.text === 'error') {
     console.error('Validation Failed');
     callback(null, {
       statusCode: 400,
@@ -28,6 +32,15 @@ module.exports.create = (event, context, callback) => {
       updatedAt: timestamp,
     },
   };
+
+// annotations 
+  AWSXRay.captureFunc('annotations', (subsegment) => {
+    subsegment.addAnnotation('toDo', data.text);
+}); 
+
+//meta data
+let subsegment = AWSXRay.getSegment().addNewSubsegment("subsegment");
+            subsegment.addMetadata('toDoMeta', "metaTodo");
 
   // write the todo to the database
   dynamoDb.put(params, (error) => {
